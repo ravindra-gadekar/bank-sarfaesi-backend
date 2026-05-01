@@ -1,4 +1,4 @@
-import { Notice, INotice, NoticeType, IChatMessage, IGeneratedDoc } from '../models/notice.model';
+import { Notice, INotice, NoticeType, IGeneratedDoc } from '../models/notice.model';
 import { transitionStatus } from './noticeStateMachine';
 import { legalValidationService } from './legalValidation.service';
 import { prefillService } from './prefill.service';
@@ -274,16 +274,6 @@ const noticeService = {
     const updated = await Notice.findOneAndUpdate(
       { branchId, _id: noticeId },
       { $set: { generatedDocs: [] } },
-      { returnDocument: 'after' },
-    ).exec();
-    if (!updated) throw ApiError.notFound('Notice not found');
-    return updated;
-  },
-
-  async saveChatLog(branchId: string, noticeId: string, chatLog: IChatMessage[]): Promise<INotice> {
-    const updated = await Notice.findOneAndUpdate(
-      { branchId, _id: noticeId },
-      { chatSessionLog: chatLog },
       { returnDocument: 'after' },
     ).exec();
     if (!updated) throw ApiError.notFound('Notice not found');
