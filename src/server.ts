@@ -2,14 +2,10 @@ import { env } from './config/env';
 import { connectDatabase } from './config/database';
 import { initAgenda } from './config/agenda';
 import { registerDocumentJobs } from './document/services/documentQueue.service';
-import { seedChatFlows } from './chat-flow/seeds/seedRunner';
 import app from './app';
 
 async function bootstrap(): Promise<void> {
   await connectDatabase();
-
-  // Seed default chat flow configs if not present
-  await seedChatFlows();
 
   // Initialize Agenda.js job queue and register job handlers
   const agenda = await initAgenda();

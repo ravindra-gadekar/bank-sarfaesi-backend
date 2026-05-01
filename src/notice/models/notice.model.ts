@@ -6,13 +6,6 @@ export type NoticeType = (typeof NOTICE_TYPES)[number];
 export const NOTICE_STATUSES = ['draft', 'submitted', 'rejected', 'approved', 'final', 'superseded'] as const;
 export type NoticeStatus = (typeof NOTICE_STATUSES)[number];
 
-export interface IChatMessage {
-  role: 'bot' | 'user';
-  message: string;
-  fieldKey?: string;
-  timestamp: Date;
-}
-
 export interface IRecipient {
   name: string;
   address: string;
@@ -34,7 +27,6 @@ export interface INotice extends Document {
   version: number;
   status: NoticeStatus;
   fields: Record<string, unknown>;
-  chatSessionLog: IChatMessage[];
   recipients: IRecipient[];
   generatedDocs: IGeneratedDoc[];
   makerUserId: Types.ObjectId;
@@ -48,16 +40,6 @@ export interface INotice extends Document {
   createdAt: Date;
   updatedAt: Date;
 }
-
-const chatMessageSchema = new Schema<IChatMessage>(
-  {
-    role: { type: String, enum: ['bot', 'user'], required: true },
-    message: { type: String, required: true },
-    fieldKey: { type: String },
-    timestamp: { type: Date, default: Date.now },
-  },
-  { _id: false },
-);
 
 const recipientSchema = new Schema<IRecipient>(
   {
@@ -87,7 +69,6 @@ const noticeSchema = new Schema<INotice>(
     version: { type: Number, default: 1 },
     status: { type: String, enum: NOTICE_STATUSES, default: 'draft' },
     fields: { type: Schema.Types.Mixed, default: {} },
-    chatSessionLog: { type: [chatMessageSchema], default: [] },
     recipients: { type: [recipientSchema], default: [] },
     generatedDocs: { type: [generatedDocSchema], default: [] },
     makerUserId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
