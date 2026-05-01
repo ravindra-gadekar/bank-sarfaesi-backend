@@ -8,7 +8,8 @@
     "start": "node dist/server.js",
     "test": "jest --passWithNoTests",
     "lint": "eslint src/",
-    "migrate:branch-to-office": "tsx src/scripts/migrate-branch-to-office.ts"
+    "migrate:branch-to-office": "tsx src/scripts/migrate-branch-to-office.ts",
+    "migrate:users-to-userkind": "tsx src/scripts/migrate-users-to-userkind.ts"
   },
   "keywords": [],
   "author": "",
