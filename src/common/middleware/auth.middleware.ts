@@ -16,6 +16,11 @@ export function authenticate(req: Request, _res: Response, next: NextFunction): 
     userId: decoded.userId,
     branchId: decoded.branchId,
     role: decoded.role,
+    userKind: decoded.userKind,
+    officeId: decoded.officeId,
+    officeType: decoded.officeType,
+    officeAncestors: decoded.officeAncestors,
+    bankRootId: decoded.bankRootId,
   };
 
   next();
