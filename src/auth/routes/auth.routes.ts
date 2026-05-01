@@ -12,8 +12,35 @@ import { otpRateLimiter } from '../middleware/rateLimiter';
 import { ApiError } from '../../common/utils/apiError';
 import { User } from '../../user/models/user.model';
 import { Branch } from '../../branch/models/branch.model';
+import { Office } from '../../office/models/office.model';
 import { authenticate } from '../../common/middleware/auth.middleware';
 import crypto from 'crypto';
+
+interface HierarchyClaims {
+  userKind?: 'app' | 'bank';
+  officeId?: string;
+  officeType?: 'HO' | 'Zonal' | 'Regional' | 'Branch';
+  officeAncestors?: string[];
+  bankRootId?: string;
+}
+
+async function buildHierarchyClaims(user: {
+  userKind?: string;
+  officeId?: { toString(): string };
+}): Promise<HierarchyClaims> {
+  if (!user.userKind) return {};
+  const claims: HierarchyClaims = { userKind: user.userKind as 'app' | 'bank' };
+  if (!user.officeId) return claims;
+  const office = await Office.findById(user.officeId).select('officeType ancestors bankRootId').exec();
+  if (!office) return claims;
+  return {
+    ...claims,
+    officeId: user.officeId.toString(),
+    officeType: office.officeType,
+    officeAncestors: office.ancestors.map((a) => a.toString()),
+    bankRootId: office.bankRootId.toString(),
+  };
+}
 
 const router = Router();
 
@@ -80,17 +107,7 @@ router.post(
     res.cookie('accessToken', accessToken, { ...cookieOptions, maxAge: 15 * 60 * 1000 });
     res.cookie('refreshToken', refreshToken, { ...cookieOptions, maxAge: 8 * 60 * 60 * 1000 });
 
-    // Return branches the user belongs to
-    const users = await User.find({ email: email.toLowerCase(), isActive: true })
-      .populate('branchId', 'bankName branchName')
-      .exec();
-
-    const branches = users.map((u) => ({
-      branchId: (u.branchId as any)._id.toString(),
-      branchName: (u.branchId as any).branchName || (u.branchId as any).bankName || 'Unknown',
-      bankName: (u.branchId as any).bankName || '',
-      role: u.role,
-    }));
+    const branches = await loadOfficeMembershipsForEmail(email.toLowerCase());
 
     res.status(200).json({
       success: true,
@@ -99,22 +116,38 @@ router.post(
   },
 );
 
-// GET /auth/my-branches — return all branches the authenticated user belongs to
+async function loadOfficeMembershipsForEmail(email: string) {
+  const users = await User.find({ email, isActive: true }).exec();
+  const officeIds = users
+    .map((u) => u.officeId ?? u.branchId)
+    .filter((id): id is NonNullable<typeof id> => !!id);
+  const offices = await Office.find({ _id: { $in: officeIds } })
+    .select('bankName branchName officeType bankRootId')
+    .exec();
+  const officeById = new Map(offices.map((o) => [o._id.toString(), o]));
+  return users
+    .map((u) => {
+      const id = (u.officeId ?? u.branchId)?.toString();
+      if (!id) return null;
+      const office = officeById.get(id);
+      return {
+        branchId: id,
+        branchName: office?.branchName || office?.bankName || 'Unknown',
+        bankName: office?.bankName || '',
+        officeType: office?.officeType ?? 'Branch',
+        bankRootId: office?.bankRootId?.toString() ?? id,
+        role: u.bankRole ?? (u.role as string | undefined),
+      };
+    })
+    .filter((b): b is NonNullable<typeof b> => !!b);
+}
+
+// GET /auth/my-branches — return all offices the authenticated user belongs to
 router.get('/auth/my-branches', authenticate, async (req: Request, res: Response) => {
   const { email } = req.context;
   if (!email) throw ApiError.unauthorized('Email not found in session');
 
-  const users = await User.find({ email, isActive: true })
-    .populate('branchId', 'bankName branchName')
-    .exec();
-
-  const branches = users.map((u) => ({
-    branchId: (u.branchId as any)._id.toString(),
-    branchName: (u.branchId as any).branchName || (u.branchId as any).bankName || 'Unknown',
-    bankName: (u.branchId as any).bankName || '',
-    role: u.role,
-  }));
-
+  const branches = await loadOfficeMembershipsForEmail(email);
   res.status(200).json({ success: true, data: { branches } });
 });
 
@@ -131,11 +164,13 @@ router.post('/auth/select-branch', authenticate, async (req: Request, res: Respo
 
   await User.findByIdAndUpdate(user._id, { lastLogin: new Date() }).exec();
 
+  const hierarchyClaims = await buildHierarchyClaims(user);
   const tokenPayload = {
     email,
     userId: user._id.toString(),
-    branchId: user.branchId.toString(),
+    branchId: user.branchId!.toString(),
     role: user.role,
+    ...hierarchyClaims,
   };
 
   const accessToken = jwtService.signAccessToken(tokenPayload);
@@ -156,6 +191,65 @@ router.post('/auth/select-branch', authenticate, async (req: Request, res: Respo
         role: user.role,
         branchId: user.branchId,
         branchName: branch?.branchName || branch?.bankName || '',
+      },
+    },
+  });
+});
+
+// POST /auth/select-office — successor to /auth/select-branch
+router.post('/auth/select-office', authenticate, async (req: Request, res: Response) => {
+  const { email } = req.context;
+  const { officeId } = req.body;
+
+  if (!email) throw ApiError.unauthorized('Email not found in session');
+  if (!officeId) throw ApiError.badRequest('officeId is required');
+
+  const user = await User.findOne({
+    email,
+    $or: [{ officeId }, { branchId: officeId }],
+    isActive: true,
+  }).exec();
+  if (!user) throw ApiError.forbidden('You do not belong to this office');
+
+  await User.findByIdAndUpdate(user._id, { lastLogin: new Date() }).exec();
+
+  const hierarchyClaims = await buildHierarchyClaims(user);
+  const tokenPayload = {
+    email,
+    userId: user._id.toString(),
+    branchId: (user.officeId ?? user.branchId)!.toString(),
+    role: user.bankRole ?? (user.role as string | undefined),
+    ...hierarchyClaims,
+  };
+
+  const accessToken = jwtService.signAccessToken(tokenPayload);
+  const refreshToken = jwtService.signRefreshToken({ email });
+
+  res.cookie('accessToken', accessToken, { ...cookieOptions, maxAge: 15 * 60 * 1000 });
+  res.cookie('refreshToken', refreshToken, { ...cookieOptions, maxAge: 8 * 60 * 60 * 1000 });
+
+  const office = await Office.findById(officeId).select('bankName branchName officeType').exec();
+
+  res.status(200).json({
+    success: true,
+    data: {
+      user: {
+        id: user._id,
+        email: user.email,
+        name: user.name,
+        userKind: user.userKind,
+        bankRole: user.bankRole,
+        appRole: user.appRole,
+        role: user.role,
+        officeId: user.officeId,
+        branchId: user.branchId,
+        branchName: office?.branchName || office?.bankName || '',
+        office: {
+          id: office?._id,
+          bankName: office?.bankName,
+          branchName: office?.branchName,
+          officeType: office?.officeType,
+        },
       },
     },
   });
@@ -185,7 +279,17 @@ router.post('/auth/refresh', async (req: Request, res: Response) => {
 
   // Look up current access token to preserve branch context if it was set
   const currentAccessToken = req.cookies?.accessToken;
-  let tokenPayloadData: { email: string; userId?: string; branchId?: string; role?: string } = {
+  let tokenPayloadData: {
+    email: string;
+    userId?: string;
+    branchId?: string;
+    role?: string;
+    userKind?: 'app' | 'bank';
+    officeId?: string;
+    officeType?: 'HO' | 'Zonal' | 'Regional' | 'Branch';
+    officeAncestors?: string[];
+    bankRootId?: string;
+  } = {
     email: payload.email,
   };
 
@@ -197,28 +301,35 @@ router.post('/auth/refresh', async (req: Request, res: Response) => {
         userId: currentPayload.userId,
         branchId: currentPayload.branchId,
         role: currentPayload.role,
+        userKind: currentPayload.userKind,
+        officeId: currentPayload.officeId,
+        officeType: currentPayload.officeType,
+        officeAncestors: currentPayload.officeAncestors,
+        bankRootId: currentPayload.bankRootId,
       };
     } catch {
-      // Access token expired — try to restore context from DB
       const user = await User.findOne({ email: payload.email, isActive: true }).exec();
       if (user) {
+        const hierarchyClaims = await buildHierarchyClaims(user);
         tokenPayloadData = {
           email: payload.email,
           userId: user._id.toString(),
-          branchId: user.branchId.toString(),
+          branchId: user.branchId?.toString(),
           role: user.role,
+          ...hierarchyClaims,
         };
       }
     }
   } else {
-    // No access token at all — try to restore from DB
     const user = await User.findOne({ email: payload.email, isActive: true }).exec();
     if (user) {
+      const hierarchyClaims = await buildHierarchyClaims(user);
       tokenPayloadData = {
         email: payload.email,
         userId: user._id.toString(),
-        branchId: user.branchId.toString(),
+        branchId: user.branchId?.toString(),
         role: user.role,
+        ...hierarchyClaims,
       };
     }
   }
