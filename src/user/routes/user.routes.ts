@@ -199,7 +199,7 @@ router.post(
     const accessToken = jwtService.signAccessToken({
       email: user.email,
       userId: user._id.toString(),
-      branchId: user.branchId.toString(),
+      branchId: user.branchId!.toString(),
       role: user.role,
     });
     const refreshToken = jwtService.signRefreshToken({
