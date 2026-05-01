@@ -12,7 +12,6 @@ import caseRouter from './case/routes/case.routes';
 import lookupRouter from './common/routes/lookup.routes';
 import auditRouter from './audit/routes/audit.routes';
 import noticeRouter from './notice/routes/notice.routes';
-import chatFlowRouter from './chat-flow/routes/chatFlow.routes';
 import documentRouter from './document/routes/document.routes';
 import dashboardRouter from './branch/routes/dashboard.routes';
 
@@ -48,7 +47,6 @@ app.use('/api', caseRouter);
 app.use('/api', lookupRouter);
 app.use('/api', auditRouter);
 app.use('/api', noticeRouter);
-app.use('/api', chatFlowRouter);
 app.use('/api', documentRouter);
 app.use('/api', dashboardRouter);
 
