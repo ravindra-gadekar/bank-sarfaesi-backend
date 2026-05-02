@@ -1,9 +1,8 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod/v4';
 import multer from 'multer';
-import { FullOnboardingSchema, UpdateBranchSchema, SsoConfigSchema } from '../dto/branch.dto';
+import { UpdateBranchSchema, SsoConfigSchema } from '../dto/branch.dto';
 import { branchService } from '../services/branch.service';
-import { userService } from '../../user/services/user.service';
 import { authenticate } from '../../common/middleware/auth.middleware';
 import { authorize, requireUserKind } from '../../common/middleware/rbac.middleware';
 import { storageService } from '../../config/storage';
@@ -36,77 +35,8 @@ const upload = multer({
   },
 });
 
-// POST /onboarding/branch — Full onboarding (create branch + assign user as admin). Requires auth.
-router.post(
-  '/onboarding/branch',
-  authenticate,
-  validate(FullOnboardingSchema),
-  async (req: Request, res: Response) => {
-    const email = req.context.email;
-    if (!email) throw ApiError.unauthorized('Email not found in session');
-
-    const { branch: branchInput, admin: adminInput } = req.body;
-
-    const branch = await branchService.create({
-      bankName: branchInput.bank.name,
-      bankType: branchInput.bank.type,
-      rbiRegNo: branchInput.bank.rbiRegNo,
-      hoAddress: branchInput.bank.hoAddress,
-      website: branchInput.bank.website,
-      branchName: branchInput.name,
-      branchCode: branchInput.code,
-      ifscCode: branchInput.ifscCode,
-      branchAddress: branchInput.address,
-      city: branchInput.city,
-      district: branchInput.district,
-      state: branchInput.state,
-      pinCode: branchInput.pinCode,
-      phone: branchInput.phone,
-      email: branchInput.email,
-      drtJurisdiction: branchInput.drt,
-    });
-
-    const adminUser = await userService.create({
-      ...adminInput,
-      email,
-      branchId: branch._id,
-      role: 'admin',
-      isActive: true,
-      authProvider: 'otp',
-    });
-
-    res.status(201).json({
-      success: true,
-      data: {
-        branch: { id: branch._id, name: branch.bankName },
-        admin: { id: adminUser._id, email: adminUser.email },
-      },
-    });
-  },
-);
-
-// POST /onboarding/letterhead — Upload letterhead during onboarding. Requires auth.
-router.post(
-  '/onboarding/letterhead',
-  authenticate,
-  upload.single('letterhead'),
-  async (req: Request, res: Response) => {
-    if (!req.file) {
-      throw ApiError.badRequest('Letterhead file is required');
-    }
-
-    const { branchId } = req.body;
-    if (!branchId) {
-      throw ApiError.badRequest('branchId is required');
-    }
-
-    const fileKey = `letterheads/${branchId}/${Date.now()}${path.extname(req.file.originalname)}`;
-    await storageService.upload(fileKey, req.file.buffer, req.file.mimetype);
-    await branchService.updateLetterhead(branchId, fileKey);
-
-    res.status(201).json({ success: true, data: { fileKey } });
-  },
-);
+// Self-signup endpoints removed — see PHASE-3. New onboarding goes through invite-only flow:
+// POST /api/invites/bank with `newOffice` payload (App-Superadmin or in-subtree HO admin).
 
 // GET /branch — Get current branch profile (auth required, bank user only)
 router.get('/branch', authenticate, requireUserKind('bank'), async (req: Request, res: Response) => {
