@@ -10,7 +10,8 @@
     "lint": "eslint src/",
     "migrate:branch-to-office": "tsx src/scripts/migrate-branch-to-office.ts",
     "migrate:users-to-userkind": "tsx src/scripts/migrate-users-to-userkind.ts",
-    "migrate:invites-to-hierarchy": "tsx src/scripts/migrate-invites-to-hierarchy.ts"
+    "migrate:invites-to-hierarchy": "tsx src/scripts/migrate-invites-to-hierarchy.ts",
+    "seed:superadmin": "tsx src/scripts/seed-superadmin.ts"
   },
   "keywords": [],
   "author": "",
