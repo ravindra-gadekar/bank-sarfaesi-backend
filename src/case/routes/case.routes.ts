@@ -4,10 +4,12 @@ import { CreateCaseSchema, UpdateCaseSchema } from '../dto/case.dto';
 import { CASE_STATUSES, CaseStatus } from '../models/case.model';
 import { caseService } from '../services/case.service';
 import { authenticate } from '../../common/middleware/auth.middleware';
-import { authorize } from '../../common/middleware/rbac.middleware';
+import { authorize, requireUserKind } from '../../common/middleware/rbac.middleware';
 import { ApiError } from '../../common/utils/apiError';
 
 const router = Router();
+
+router.use('/cases', authenticate, requireUserKind('bank'));
 
 function validate(schema: z.ZodType) {
   return (req: Request, _res: Response, next: NextFunction) => {
@@ -23,7 +25,6 @@ function validate(schema: z.ZodType) {
 // POST /cases — Create a new NPA case
 router.post(
   '/cases',
-  authenticate,
   authorize('admin', 'manager', 'maker'),
   validate(CreateCaseSchema),
   async (req: Request, res: Response) => {
@@ -38,7 +39,6 @@ router.post(
 // GET /cases — List cases with pagination and optional search/status filter
 router.get(
   '/cases',
-  authenticate,
   async (req: Request, res: Response) => {
     const { branchId } = req.context;
     if (!branchId) throw ApiError.unauthorized();
@@ -61,7 +61,6 @@ router.get(
 // GET /cases/:id — Get a single case by ID
 router.get(
   '/cases/:id',
-  authenticate,
   async (req: Request, res: Response) => {
     const { branchId } = req.context;
     if (!branchId) throw ApiError.unauthorized();
@@ -74,7 +73,6 @@ router.get(
 // PUT /cases/:id — Update a case
 router.put(
   '/cases/:id',
-  authenticate,
   authorize('admin', 'manager', 'maker'),
   validate(UpdateCaseSchema),
   async (req: Request, res: Response) => {

@@ -8,7 +8,7 @@ import { inviteService } from '../services/invite.service';
 import { User } from '../models/user.model';
 import { Invite } from '../models/invite.model';
 import { authenticate } from '../../common/middleware/auth.middleware';
-import { authorize } from '../../common/middleware/rbac.middleware';
+import { authorize, requireUserKind } from '../../common/middleware/rbac.middleware';
 import { otpService } from '../../auth/services/otp.service';
 import { jwtService } from '../../auth/services/jwt.service';
 import { ApiError } from '../../common/utils/apiError';
@@ -33,10 +33,11 @@ const cookieOptions = {
   path: '/',
 };
 
-// GET /users — List all users in branch (auth + Admin/Manager)
+// GET /users — List all users in branch (auth + Admin/Manager, bank user only)
 router.get(
   '/users',
   authenticate,
+  requireUserKind('bank'),
   authorize('admin', 'manager'),
   async (req: Request, res: Response) => {
     const { branchId } = req.context;
@@ -61,10 +62,11 @@ router.get('/users/me', authenticate, async (req: Request, res: Response) => {
   res.status(200).json({ success: true, data: user });
 });
 
-// PATCH /users/:id/role — Change user role (auth + Admin only)
+// PATCH /users/:id/role — Change user role (auth + Admin only, bank user only)
 router.patch(
   '/users/:id/role',
   authenticate,
+  requireUserKind('bank'),
   authorize('admin'),
   validate(UpdateRoleSchema),
   async (req: Request, res: Response) => {
@@ -76,10 +78,11 @@ router.patch(
   },
 );
 
-// PATCH /users/:id/deactivate — Deactivate user (auth + Admin only)
+// PATCH /users/:id/deactivate — Deactivate user (auth + Admin only, bank user only)
 router.patch(
   '/users/:id/deactivate',
   authenticate,
+  requireUserKind('bank'),
   authorize('admin'),
   async (req: Request, res: Response) => {
     const { branchId, userId } = req.context;

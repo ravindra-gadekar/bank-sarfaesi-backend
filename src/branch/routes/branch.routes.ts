@@ -5,7 +5,7 @@ import { FullOnboardingSchema, UpdateBranchSchema, SsoConfigSchema } from '../dt
 import { branchService } from '../services/branch.service';
 import { userService } from '../../user/services/user.service';
 import { authenticate } from '../../common/middleware/auth.middleware';
-import { authorize } from '../../common/middleware/rbac.middleware';
+import { authorize, requireUserKind } from '../../common/middleware/rbac.middleware';
 import { storageService } from '../../config/storage';
 import { ApiError } from '../../common/utils/apiError';
 import path from 'path';
@@ -108,8 +108,8 @@ router.post(
   },
 );
 
-// GET /branch — Get current branch profile (auth required)
-router.get('/branch', authenticate, async (req: Request, res: Response) => {
+// GET /branch — Get current branch profile (auth required, bank user only)
+router.get('/branch', authenticate, requireUserKind('bank'), async (req: Request, res: Response) => {
   const { branchId } = req.context;
   if (!branchId) throw ApiError.unauthorized();
 
@@ -119,10 +119,11 @@ router.get('/branch', authenticate, async (req: Request, res: Response) => {
   res.status(200).json({ success: true, data: branch });
 });
 
-// PUT /branch — Update branch profile (auth + Admin only)
+// PUT /branch — Update branch profile (auth + Admin only, bank user only)
 router.put(
   '/branch',
   authenticate,
+  requireUserKind('bank'),
   authorize('admin'),
   validate(UpdateBranchSchema),
   async (req: Request, res: Response) => {
@@ -134,10 +135,11 @@ router.put(
   },
 );
 
-// PUT /branch/sso — Update SSO config (auth + Admin only)
+// PUT /branch/sso — Update SSO config (auth + Admin only, bank user only)
 router.put(
   '/branch/sso',
   authenticate,
+  requireUserKind('bank'),
   authorize('admin'),
   validate(SsoConfigSchema),
   async (req: Request, res: Response) => {
@@ -149,10 +151,11 @@ router.put(
   },
 );
 
-// POST /branch/letterhead — Upload/replace letterhead (auth + Admin only)
+// POST /branch/letterhead — Upload/replace letterhead (auth + Admin only, bank user only)
 router.post(
   '/branch/letterhead',
   authenticate,
+  requireUserKind('bank'),
   authorize('admin'),
   upload.single('letterhead'),
   async (req: Request, res: Response) => {
