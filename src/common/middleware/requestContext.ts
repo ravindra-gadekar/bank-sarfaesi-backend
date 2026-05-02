@@ -5,6 +5,11 @@ export interface RequestContext {
   userId?: string;
   branchId?: string;
   role?: string;
+  userKind?: 'app' | 'bank';
+  officeId?: string;
+  officeType?: 'HO' | 'Zonal' | 'Regional' | 'Branch';
+  officeAncestors?: string[];
+  bankRootId?: string;
 }
 
 declare global {
@@ -16,12 +21,16 @@ declare global {
 }
 
 export function requestContext(req: Request, _res: Response, next: NextFunction): void {
-  // Initialize empty context — will be populated by auth middleware in Phase 1
   req.context = {
     email: undefined,
     userId: undefined,
     branchId: undefined,
     role: undefined,
+    userKind: undefined,
+    officeId: undefined,
+    officeType: undefined,
+    officeAncestors: undefined,
+    bankRootId: undefined,
   };
   next();
 }

@@ -2,11 +2,16 @@ import jwt from 'jsonwebtoken';
 import { env } from '../../config/env';
 import { ApiError } from '../../common/utils/apiError';
 
-interface AccessTokenPayload {
+export interface AccessTokenPayload {
   email: string;
   userId?: string;
   branchId?: string;
   role?: string;
+  userKind?: 'app' | 'bank';
+  officeId?: string;
+  officeType?: 'HO' | 'Zonal' | 'Regional' | 'Branch';
+  officeAncestors?: string[];
+  bankRootId?: string;
 }
 
 interface RefreshTokenPayload {

@@ -1,15 +1,16 @@
 import { Router, Request, Response } from 'express';
 import { authenticate } from '../../common/middleware/auth.middleware';
-import { authorize } from '../../common/middleware/rbac.middleware';
+import { authorize, requireUserKind } from '../../common/middleware/rbac.middleware';
 import { auditService } from '../services/audit.service';
 import { ApiError } from '../../common/utils/apiError';
 
 const router = Router();
 
+router.use('/audit-logs', authenticate, requireUserKind('bank'));
+
 // GET /audit-logs — list audit logs (paginated, filtered)
 router.get(
   '/audit-logs',
-  authenticate,
   authorize('admin', 'manager', 'auditor'),
   async (req: Request, res: Response) => {
     const { branchId } = req.context;
@@ -35,7 +36,6 @@ router.get(
 // GET /audit-logs/entity/:entity/:entityId — logs for a specific entity
 router.get(
   '/audit-logs/entity/:entity/:entityId',
-  authenticate,
   authorize('admin', 'manager', 'auditor'),
   async (req: Request, res: Response) => {
     const { branchId } = req.context;

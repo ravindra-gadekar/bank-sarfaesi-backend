@@ -4,9 +4,11 @@ import crypto from 'crypto';
 import { UpdateRoleSchema } from '../dto/user.dto';
 import { CreateInviteSchema, AcceptInviteSchema } from '../dto/invite.dto';
 import { userService } from '../services/user.service';
+import { inviteService } from '../services/invite.service';
+import { User } from '../models/user.model';
 import { Invite } from '../models/invite.model';
 import { authenticate } from '../../common/middleware/auth.middleware';
-import { authorize } from '../../common/middleware/rbac.middleware';
+import { authorize, requireUserKind } from '../../common/middleware/rbac.middleware';
 import { otpService } from '../../auth/services/otp.service';
 import { jwtService } from '../../auth/services/jwt.service';
 import { ApiError } from '../../common/utils/apiError';
@@ -31,10 +33,11 @@ const cookieOptions = {
   path: '/',
 };
 
-// GET /users — List all users in branch (auth + Admin/Manager)
+// GET /users — List all users in branch (auth + Admin/Manager, bank user only)
 router.get(
   '/users',
   authenticate,
+  requireUserKind('bank'),
   authorize('admin', 'manager'),
   async (req: Request, res: Response) => {
     const { branchId } = req.context;
@@ -59,10 +62,11 @@ router.get('/users/me', authenticate, async (req: Request, res: Response) => {
   res.status(200).json({ success: true, data: user });
 });
 
-// PATCH /users/:id/role — Change user role (auth + Admin only)
+// PATCH /users/:id/role — Change user role (auth + Admin only, bank user only)
 router.patch(
   '/users/:id/role',
   authenticate,
+  requireUserKind('bank'),
   authorize('admin'),
   validate(UpdateRoleSchema),
   async (req: Request, res: Response) => {
@@ -74,10 +78,11 @@ router.patch(
   },
 );
 
-// PATCH /users/:id/deactivate — Deactivate user (auth + Admin only)
+// PATCH /users/:id/deactivate — Deactivate user (auth + Admin only, bank user only)
 router.patch(
   '/users/:id/deactivate',
   authenticate,
+  requireUserKind('bank'),
   authorize('admin'),
   async (req: Request, res: Response) => {
     const { branchId, userId } = req.context;
@@ -92,45 +97,29 @@ router.patch(
   },
 );
 
-// POST /users/invite — Create invite (auth + Admin only)
+// POST /users/invite — DEPRECATED. Delegates to inviteService.createBankInvite for the actor's own office.
+// Prefer POST /api/invites/bank with explicit targetOfficeId.
 router.post(
   '/users/invite',
   authenticate,
   authorize('admin'),
   validate(CreateInviteSchema),
   async (req: Request, res: Response) => {
-    const { branchId } = req.context;
-    if (!branchId) throw ApiError.unauthorized();
+    const { userId } = req.context;
+    if (!userId) throw ApiError.unauthorized();
+
+    const actor = await User.findById(userId).exec();
+    if (!actor) throw ApiError.unauthorized('Actor not found');
+    if (!actor.officeId) throw ApiError.badRequest('Actor has no officeId');
 
     const { email, role } = req.body;
-
-    // Check for existing pending invite for this email in this branch
-    const existingInvite = await Invite.findOne({
-      branchId,
-      email: email.toLowerCase(),
-      usedAt: { $exists: false },
-      expiresAt: { $gt: new Date() },
-    }).exec();
-    if (existingInvite) {
-      throw ApiError.conflict('An active invite already exists for this email');
-    }
-
-    const token = crypto.randomUUID();
-    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
-
-    await Invite.create({
-      branchId,
-      email: email.toLowerCase(),
-      role,
-      tokenHash,
-      expiresAt: new Date(Date.now() + 72 * 60 * 60 * 1000), // 72 hours
-      invitedBy: req.context.userId,
+    const inv = await inviteService.createBankInvite(actor, {
+      email,
+      bankRole: role,
+      targetOfficeId: actor.officeId.toString(),
     });
-
-    res.status(201).json({
-      success: true,
-      data: { token, email, role },
-    });
+    const token = (inv as unknown as { _plainToken: string })._plainToken;
+    res.status(201).json({ success: true, data: { token, email, role } });
   },
 );
 
@@ -199,7 +188,7 @@ router.post(
     const accessToken = jwtService.signAccessToken({
       email: user.email,
       userId: user._id.toString(),
-      branchId: user.branchId.toString(),
+      branchId: user.branchId!.toString(),
       role: user.role,
     });
     const refreshToken = jwtService.signRefreshToken({

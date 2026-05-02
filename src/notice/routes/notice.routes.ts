@@ -3,10 +3,12 @@ import { z } from 'zod/v4';
 import { CreateNoticeSchema, UpdateNoticeFieldsSchema, ApproveRejectSchema } from '../dto/notice.dto';
 import { noticeService } from '../services/notice.service';
 import { authenticate } from '../../common/middleware/auth.middleware';
-import { authorize } from '../../common/middleware/rbac.middleware';
+import { authorize, requireUserKind, requireOfficeType } from '../../common/middleware/rbac.middleware';
 import { ApiError } from '../../common/utils/apiError';
 
 const router = Router();
+
+router.use('/notices', authenticate, requireUserKind('bank'));
 
 function validate(schema: z.ZodType) {
   return (req: Request, _res: Response, next: NextFunction) => {
@@ -19,10 +21,10 @@ function validate(schema: z.ZodType) {
   };
 }
 
-// POST /notices — Create draft notice
+// POST /notices — Create draft notice (Branch only)
 router.post(
   '/notices',
-  authenticate,
+  requireOfficeType('Branch'),
   authorize('admin', 'manager', 'maker'),
   validate(CreateNoticeSchema),
   async (req: Request, res: Response) => {
@@ -35,10 +37,10 @@ router.post(
   },
 );
 
-// PUT /notices/:id/fields — Update notice fields (draft/rejected only)
+// PUT /notices/:id/fields — Update notice fields (Branch only, draft/rejected)
 router.put(
   '/notices/:id/fields',
-  authenticate,
+  requireOfficeType('Branch'),
   authorize('admin', 'manager', 'maker'),
   validate(UpdateNoticeFieldsSchema),
   async (req: Request, res: Response) => {
@@ -50,10 +52,10 @@ router.put(
   },
 );
 
-// POST /notices/:id/submit — Submit for review (maker only)
+// POST /notices/:id/submit — Submit for review (Branch only, maker)
 router.post(
   '/notices/:id/submit',
-  authenticate,
+  requireOfficeType('Branch'),
   authorize('admin', 'manager', 'maker'),
   async (req: Request, res: Response) => {
     const { branchId, userId } = req.context;
@@ -64,10 +66,10 @@ router.post(
   },
 );
 
-// POST /notices/:id/approve — Approve notice (checker, not same as maker)
+// POST /notices/:id/approve — Approve notice (Branch only, checker)
 router.post(
   '/notices/:id/approve',
-  authenticate,
+  requireOfficeType('Branch'),
   authorize('admin', 'manager', 'checker'),
   validate(ApproveRejectSchema),
   async (req: Request, res: Response) => {
@@ -79,10 +81,10 @@ router.post(
   },
 );
 
-// POST /notices/:id/reject — Reject notice with mandatory comment
+// POST /notices/:id/reject — Reject notice (Branch only)
 router.post(
   '/notices/:id/reject',
-  authenticate,
+  requireOfficeType('Branch'),
   authorize('admin', 'manager', 'checker'),
   validate(ApproveRejectSchema),
   async (req: Request, res: Response) => {
@@ -102,7 +104,6 @@ router.post(
 // GET /notices/pending-review — List submitted notices (MUST be before /:id)
 router.get(
   '/notices/pending-review',
-  authenticate,
   authorize('admin', 'manager', 'checker'),
   async (req: Request, res: Response) => {
     const { branchId } = req.context;
@@ -113,10 +114,10 @@ router.get(
   },
 );
 
-// DELETE /notices/:id — Delete a draft notice (maker only)
+// DELETE /notices/:id — Delete a draft notice (Branch only)
 router.delete(
   '/notices/:id',
-  authenticate,
+  requireOfficeType('Branch'),
   authorize('admin', 'manager', 'maker'),
   async (req: Request, res: Response) => {
     const { branchId, userId } = req.context;
@@ -130,7 +131,6 @@ router.delete(
 // GET /notices — List notices (optionally filtered by caseId)
 router.get(
   '/notices',
-  authenticate,
   async (req: Request, res: Response) => {
     const { branchId } = req.context;
     if (!branchId) throw ApiError.unauthorized();
@@ -156,7 +156,6 @@ router.get(
 // GET /notices/:id/versions — Get all versions in the supersede chain
 router.get(
   '/notices/:id/versions',
-  authenticate,
   async (req: Request, res: Response) => {
     const { branchId } = req.context;
     if (!branchId) throw ApiError.unauthorized();
@@ -166,10 +165,10 @@ router.get(
   },
 );
 
-// POST /notices/:id/supersede — Supersede a finalized notice (creates new draft version)
+// POST /notices/:id/supersede — Supersede a finalized notice (Branch only)
 router.post(
   '/notices/:id/supersede',
-  authenticate,
+  requireOfficeType('Branch'),
   authorize('admin', 'manager', 'maker'),
   async (req: Request, res: Response) => {
     const { branchId, userId } = req.context;
@@ -183,7 +182,6 @@ router.post(
 // GET /notices/:id/compare/:otherId — Compare fields between two notice versions
 router.get(
   '/notices/:id/compare/:otherId',
-  authenticate,
   async (req: Request, res: Response) => {
     const { branchId } = req.context;
     if (!branchId) throw ApiError.unauthorized();
@@ -210,7 +208,6 @@ router.get(
 // GET /notices/:id — Get notice detail
 router.get(
   '/notices/:id',
-  authenticate,
   async (req: Request, res: Response) => {
     const { branchId } = req.context;
     if (!branchId) throw ApiError.unauthorized();
