@@ -56,3 +56,19 @@ async function resolveAncestors(targetOfficeId: string): Promise<string[]> {
   if (!office) throw ApiError.notFound('Target office not found');
   return office.ancestors.map((a) => a.toString());
 }
+
+/**
+ * Asserts the caller's officeType is one of the allowed types. Used to scope
+ * mutating handlers (e.g. notice authoring) to specific levels of the hierarchy.
+ * App users bypass.
+ */
+export function requireOfficeType(...allowed: Array<'HO' | 'Zonal' | 'Regional' | 'Branch'>) {
+  return (req: Request, _res: Response, next: NextFunction): void => {
+    if (req.context?.userKind === 'app') return next();
+    const t = req.context?.officeType;
+    if (!t || !allowed.includes(t)) {
+      return next(ApiError.forbidden(`Requires office type: ${allowed.join(', ')}`));
+    }
+    next();
+  };
+}

@@ -4,7 +4,7 @@ import { CreateCaseSchema, UpdateCaseSchema } from '../dto/case.dto';
 import { CASE_STATUSES, CaseStatus } from '../models/case.model';
 import { caseService } from '../services/case.service';
 import { authenticate } from '../../common/middleware/auth.middleware';
-import { authorize, requireUserKind } from '../../common/middleware/rbac.middleware';
+import { authorize, requireUserKind, requireOfficeType } from '../../common/middleware/rbac.middleware';
 import { ApiError } from '../../common/utils/apiError';
 
 const router = Router();
@@ -22,9 +22,10 @@ function validate(schema: z.ZodType) {
   };
 }
 
-// POST /cases — Create a new NPA case
+// POST /cases — Create a new NPA case (Branch only)
 router.post(
   '/cases',
+  requireOfficeType('Branch'),
   authorize('admin', 'manager', 'maker'),
   validate(CreateCaseSchema),
   async (req: Request, res: Response) => {
@@ -70,9 +71,10 @@ router.get(
   },
 );
 
-// PUT /cases/:id — Update a case
+// PUT /cases/:id — Update a case (Branch only)
 router.put(
   '/cases/:id',
+  requireOfficeType('Branch'),
   authorize('admin', 'manager', 'maker'),
   validate(UpdateCaseSchema),
   async (req: Request, res: Response) => {

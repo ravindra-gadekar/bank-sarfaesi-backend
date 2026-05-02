@@ -3,7 +3,7 @@ import { z } from 'zod/v4';
 import { CreateNoticeSchema, UpdateNoticeFieldsSchema, ApproveRejectSchema } from '../dto/notice.dto';
 import { noticeService } from '../services/notice.service';
 import { authenticate } from '../../common/middleware/auth.middleware';
-import { authorize, requireUserKind } from '../../common/middleware/rbac.middleware';
+import { authorize, requireUserKind, requireOfficeType } from '../../common/middleware/rbac.middleware';
 import { ApiError } from '../../common/utils/apiError';
 
 const router = Router();
@@ -21,9 +21,10 @@ function validate(schema: z.ZodType) {
   };
 }
 
-// POST /notices — Create draft notice
+// POST /notices — Create draft notice (Branch only)
 router.post(
   '/notices',
+  requireOfficeType('Branch'),
   authorize('admin', 'manager', 'maker'),
   validate(CreateNoticeSchema),
   async (req: Request, res: Response) => {
@@ -36,9 +37,10 @@ router.post(
   },
 );
 
-// PUT /notices/:id/fields — Update notice fields (draft/rejected only)
+// PUT /notices/:id/fields — Update notice fields (Branch only, draft/rejected)
 router.put(
   '/notices/:id/fields',
+  requireOfficeType('Branch'),
   authorize('admin', 'manager', 'maker'),
   validate(UpdateNoticeFieldsSchema),
   async (req: Request, res: Response) => {
@@ -50,9 +52,10 @@ router.put(
   },
 );
 
-// POST /notices/:id/submit — Submit for review (maker only)
+// POST /notices/:id/submit — Submit for review (Branch only, maker)
 router.post(
   '/notices/:id/submit',
+  requireOfficeType('Branch'),
   authorize('admin', 'manager', 'maker'),
   async (req: Request, res: Response) => {
     const { branchId, userId } = req.context;
@@ -63,9 +66,10 @@ router.post(
   },
 );
 
-// POST /notices/:id/approve — Approve notice (checker, not same as maker)
+// POST /notices/:id/approve — Approve notice (Branch only, checker)
 router.post(
   '/notices/:id/approve',
+  requireOfficeType('Branch'),
   authorize('admin', 'manager', 'checker'),
   validate(ApproveRejectSchema),
   async (req: Request, res: Response) => {
@@ -77,9 +81,10 @@ router.post(
   },
 );
 
-// POST /notices/:id/reject — Reject notice with mandatory comment
+// POST /notices/:id/reject — Reject notice (Branch only)
 router.post(
   '/notices/:id/reject',
+  requireOfficeType('Branch'),
   authorize('admin', 'manager', 'checker'),
   validate(ApproveRejectSchema),
   async (req: Request, res: Response) => {
@@ -109,9 +114,10 @@ router.get(
   },
 );
 
-// DELETE /notices/:id — Delete a draft notice (maker only)
+// DELETE /notices/:id — Delete a draft notice (Branch only)
 router.delete(
   '/notices/:id',
+  requireOfficeType('Branch'),
   authorize('admin', 'manager', 'maker'),
   async (req: Request, res: Response) => {
     const { branchId, userId } = req.context;
@@ -159,9 +165,10 @@ router.get(
   },
 );
 
-// POST /notices/:id/supersede — Supersede a finalized notice (creates new draft version)
+// POST /notices/:id/supersede — Supersede a finalized notice (Branch only)
 router.post(
   '/notices/:id/supersede',
+  requireOfficeType('Branch'),
   authorize('admin', 'manager', 'maker'),
   async (req: Request, res: Response) => {
     const { branchId, userId } = req.context;
