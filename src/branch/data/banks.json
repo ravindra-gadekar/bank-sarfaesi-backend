@@ -1,0 +1,14 @@
+{
+  "banks": [
+    { "name": "State Bank of India", "logoKey": "logos/sbi.png" },
+    { "name": "HDFC Bank", "logoKey": "logos/hdfc.png" },
+    { "name": "ICICI Bank", "logoKey": "logos/icici.png" },
+    { "name": "Axis Bank", "logoKey": "logos/axis.png" },
+    { "name": "Kotak Mahindra Bank", "logoKey": "logos/kotak.png" },
+    { "name": "Punjab National Bank", "logoKey": "logos/pnb.png" },
+    { "name": "Bank of Baroda", "logoKey": "logos/bob.png" },
+    { "name": "Canara Bank", "logoKey": "logos/canara.png" },
+    { "name": "Union Bank of India", "logoKey": "logos/union.png" },
+    { "name": "Indian Bank", "logoKey": "logos/indian.png" }
+  ]
+}

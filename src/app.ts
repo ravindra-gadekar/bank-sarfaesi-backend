@@ -15,6 +15,7 @@ import noticeRouter from './notice/routes/notice.routes';
 import documentRouter from './document/routes/document.routes';
 import dashboardRouter from './branch/routes/dashboard.routes';
 import officeRouter from './office/routes/office.routes';
+import banksRouter from './branch/routes/banks.routes';
 
 const app = express();
 
@@ -51,6 +52,7 @@ app.use('/api', noticeRouter);
 app.use('/api', documentRouter);
 app.use('/api', dashboardRouter);
 app.use('/api', officeRouter);
+app.use('/api', banksRouter);
 
 // Global error handler (must be last)
 app.use(errorHandler);
