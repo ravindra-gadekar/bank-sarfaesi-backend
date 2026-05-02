@@ -100,18 +100,49 @@ router.post(
     const { email, otp } = req.body;
     await otpService.verifyOtp(email, otp);
 
-    // Issue identity-level tokens (email only — branch selected later)
+    const lower = email.toLowerCase();
+    const appUser = await User.findOne({ email: lower, userKind: 'app', isActive: true }).exec();
+
+    if (appUser) {
+      // App users have no office — issue a full token immediately
+      await User.findByIdAndUpdate(appUser._id, { lastLogin: new Date() }).exec();
+      const accessToken = jwtService.signAccessToken({
+        email: appUser.email,
+        userId: appUser._id.toString(),
+        role: appUser.role,
+        userKind: 'app',
+      });
+      const refreshToken = jwtService.signRefreshToken({ email: appUser.email });
+      res.cookie('accessToken', accessToken, { ...cookieOptions, maxAge: 15 * 60 * 1000 });
+      res.cookie('refreshToken', refreshToken, { ...cookieOptions, maxAge: 8 * 60 * 60 * 1000 });
+      return res.status(200).json({
+        success: true,
+        data: {
+          email,
+          branches: [],
+          userKind: 'app',
+          user: {
+            id: appUser._id,
+            email: appUser.email,
+            name: appUser.name,
+            userKind: 'app',
+            appRole: appUser.appRole,
+            role: appUser.role,
+          },
+        },
+      });
+    }
+
+    // Bank user: identity-level tokens, branch selected later
     const accessToken = jwtService.signAccessToken({ email });
     const refreshToken = jwtService.signRefreshToken({ email });
-
     res.cookie('accessToken', accessToken, { ...cookieOptions, maxAge: 15 * 60 * 1000 });
     res.cookie('refreshToken', refreshToken, { ...cookieOptions, maxAge: 8 * 60 * 60 * 1000 });
 
-    const branches = await loadOfficeMembershipsForEmail(email.toLowerCase());
-
+    const branches = await loadOfficeMembershipsForEmail(lower);
     res.status(200).json({
       success: true,
-      data: { email, branches },
+      data: { email, branches, userKind: 'bank' as const },
     });
   },
 );
