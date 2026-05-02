@@ -18,6 +18,7 @@ import officeRouter from './office/routes/office.routes';
 import banksRouter from './branch/routes/banks.routes';
 import inviteRouter from './user/routes/invite.routes';
 import appAdminRouter from './app-admin/routes/appAdmin.routes';
+import bankOversightRouter from './bank-oversight/routes/bankOversight.routes';
 
 const app = express();
 
@@ -57,6 +58,7 @@ app.use('/api', officeRouter);
 app.use('/api', banksRouter);
 app.use('/api', inviteRouter);
 app.use('/api', appAdminRouter);
+app.use('/api', bankOversightRouter);
 
 // Global error handler (must be last)
 app.use(errorHandler);
