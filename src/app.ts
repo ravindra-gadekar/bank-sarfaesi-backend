@@ -16,6 +16,7 @@ import documentRouter from './document/routes/document.routes';
 import dashboardRouter from './branch/routes/dashboard.routes';
 import officeRouter from './office/routes/office.routes';
 import banksRouter from './branch/routes/banks.routes';
+import inviteRouter from './user/routes/invite.routes';
 
 const app = express();
 
@@ -53,6 +54,7 @@ app.use('/api', documentRouter);
 app.use('/api', dashboardRouter);
 app.use('/api', officeRouter);
 app.use('/api', banksRouter);
+app.use('/api', inviteRouter);
 
 // Global error handler (must be last)
 app.use(errorHandler);
