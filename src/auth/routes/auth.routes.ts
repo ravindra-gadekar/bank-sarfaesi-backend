@@ -79,16 +79,32 @@ async function issueSsoTokensAndRedirect(res: Response, email: string): Promise<
   res.redirect(frontendUrl('/sso/callback'));
 }
 
-// POST /auth/otp/request — validate email, rate limit, generate OTP, send email
+// POST /auth/otp/request — invite-only system: only registered emails get a real OTP.
+// Unknown emails get the same response shape so we don't leak which addresses exist.
 router.post(
   '/auth/otp/request',
   otpRateLimiter,
   validate(OtpRequestSchema),
   async (req: Request, res: Response) => {
     const { email } = req.body;
+    const lower = email.toLowerCase();
+    const known = await User.findOne({ email: lower, isActive: true })
+      .select('_id')
+      .exec();
+    if (!known) {
+      // Constant-ish work for timing-channel mitigation, then return the same shape.
+      await new Promise((r) => setTimeout(r, 50));
+      return res.status(200).json({
+        success: true,
+        data: { message: 'If this email is registered, an OTP has been sent.' },
+      });
+    }
     const otp = await otpService.generateOtp(email);
     await emailService.sendOtpEmail(email, otp);
-    res.status(200).json({ success: true, data: { message: 'OTP sent to email' } });
+    res.status(200).json({
+      success: true,
+      data: { message: 'If this email is registered, an OTP has been sent.' },
+    });
   },
 );
 
@@ -469,24 +485,31 @@ router.get('/auth/sso/microsoft/callback', async (req: Request, res: Response) =
   }
 });
 
-// POST /auth/signup/check-email — check if email has pending invite
+// POST /auth/signup/check-email — returns whether the email is known to the system.
+// Used by the frontend LoginPage to decide whether to show "ask your administrator" inline
+// before the user wastes time waiting for an OTP that will never arrive.
 router.post('/auth/signup/check-email', async (req: Request, res: Response) => {
   const { email } = req.body;
   if (!email || typeof email !== 'string') {
     throw ApiError.badRequest('Email is required');
   }
-
-  const invite = await Invite.findOne({
-    email: email.toLowerCase(),
-    usedAt: { $exists: false },
-    expiresAt: { $gt: new Date() },
-  }).exec();
+  const lower = email.toLowerCase();
+  const [user, invite] = await Promise.all([
+    User.findOne({ email: lower, isActive: true }).select('_id').exec(),
+    Invite.findOne({
+      email: lower,
+      usedAt: { $exists: false },
+      expiresAt: { $gt: new Date() },
+    })
+      .select('_id')
+      .exec(),
+  ]);
 
   res.status(200).json({
     success: true,
     data: {
+      userExists: !!user,
       hasInvite: !!invite,
-      branchId: invite?.branchId?.toString() ?? null,
     },
   });
 });
